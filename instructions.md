@@ -2,7 +2,7 @@
 
 > A living document guiding the design and build of a website that is both a **personal repository for ideas** (visual and verbal) and a **place to share those ideas with others**. This is the source of truth for what we're building and why. Update it as decisions change.
 
-_Last updated: 2026-06-26 · Status: concept / pre-build · **Security-first** — see §2 and §5A_
+_Last updated: 2026-06-29 · Status: Phase 1 in progress (private capture, boards, edit/delete) · **Security-first** — see §2 and §5A_
 
 ---
 
@@ -90,6 +90,29 @@ The atomic unit is an **Idea** (internally we may call it a `card` or `pin`). An
 Two model decisions worth flagging now:
 - **Board membership references ideas; cross-user re-pins fork them.** Within a user's own boards, the same idea can appear in many places without duplication via `BoardItem`. When another user re-pins an idea, that creates a new idea row with `origin_id` set so we keep attribution and can show "saved from."
 - **Rich text vs. blocks.** Start with markdown/rich-text for `body`. If we later want Notion-style mixed-media documents, migrate `body` to a block model — keep the door open by storing body in a structured field, not raw HTML.
+
+---
+
+## 4A. Re-pin, deletion & demotion semantics (decided)
+
+**Governing principle: a re-pin is a self-sufficient snapshot plus an attribution link — never a live pointer to someone else's idea.** When user B re-pins user A's idea, B gets a new idea row they own, with `origin_id` set to A's idea for attribution. At pin time we **copy** the content B was authorized to see — `body`, `source_url`, any external media URL, and a snapshot of A's author label ("saved from @a"). Because the copy is independent, what A later does to the original cannot silently empty B's copy.
+
+This makes the deletion/demotion behavior fall out cleanly:
+
+**Deleting the original.** The origin idea is removed and `origin_id` becomes a dangling reference. Every re-pin remains fully renderable from its own snapshot. Attribution falls back to the stored author label and may render as "original removed."
+
+**Demoting the original** (owner pulls visibility back to a narrower tier). The original still exists; access to *it* is revoked immediately and server-side (per §3). Re-pins that were already taken while it was shareable persist — they are independent copies, not access grants, so they are not clawed back. Going forward, no one new can view or re-pin. This is exactly the "already-saved copies by others may persist" note in §3, made concrete.
+
+**The external-vs-hosted distinction (the load-bearing rule):**
+
+- **Externally-hosted content — preserved, always.** Links (`source_url`) and images referenced by an external URL are not ours. The re-pin keeps its own copy of the URL, so deleting or demoting the original has no effect on the re-pin. The external resource lives or dies on its own host, independent of PinBoard.
+- **PinBoard-hosted media — preserved via reference counting.** For assets we store in object storage (uploaded images, audio, files), a stored object is **reference-counted across all ideas that point at it** (origin and every re-pin). Deleting the origin only *unlinks* its reference; the bytes are garbage-collected by a background job **only when the last reference is gone**. So B's re-pin of A's uploaded image keeps working after A deletes the original, because B's copy still holds a reference and the object isn't collected.
+
+**Edits do not propagate.** Since a re-pin is a snapshot, later edits to the original never change copies others have taken. This is a deliberate trade (no live sync) in favor of legibility and a firm "your copy is yours" guarantee.
+
+**Security invariant (non-negotiable).** A snapshot may only ever contain content the re-pinner was authorized to see at pin time — re-pin runs through the same authorization layer as any read (§5.2, lib/authz.ts). You cannot re-pin what you cannot view, so preservation can never become a leak of something the re-pinner was never allowed to have. Likewise, reference counting must never let a re-pinner reach a *different, still-private* asset — references are per-asset and only created from content already resolved as visible.
+
+**Schema implications to carry into Phase 2:** a `Repin`/`origin_id` linkage that stores the author-attribution snapshot; snapshot columns (or a copy step) for `body`/`source_url`/external media URL on re-pin; and a reference-counted media model (a `media` table or a `references` count) with a GC job that deletes storage objects only at zero references. Hard deletion of ideas (current Phase 1 behavior) becomes an *unlink + conditional GC* once re-pins exist.
 
 ---
 
@@ -241,7 +264,7 @@ Build the seams early (storage, search, feed, authz) so later phases swap implem
 
 - **Monetization** — free + premium storage/features? Pro for power users? Decide before public launch as it shapes limits and the data model.
 - **AI features** — auto-tagging, semantic search, "ideas related to this," summarization of long verbal ideas. Likely valuable; scope after MVP.
-- **Re-pin semantics on demotion/deletion** — exactly what persists for others when an owner pulls something back. Needs a clear, user-legible rule.
+- ~~**Re-pin semantics on demotion/deletion**~~ — **decided, see §4A.** A re-pin is a self-sufficient snapshot + attribution link; external content is preserved by copying its URL, PinBoard-hosted media by reference counting; demotion revokes the original but not copies already taken.
 - **Real-time collaboration depth** — presence only, or full concurrent editing (CRDTs)? Affects board architecture.
 - **Naming** — "PinBoard Junior" is the working title; revisit before public launch.
 
