@@ -5,16 +5,18 @@ import { createClient } from "@/utils/supabase/server";
 import { signPaths } from "@/lib/media";
 import { updateIdea } from "../../vault/actions";
 import { DeleteIdeaButton } from "./DeleteIdeaButton";
+import { SharePanel } from "@/app/share/SharePanel";
+import { loadShareRows } from "@/app/share/data";
 
 export default async function IdeaDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; shareError?: string; shared?: string }>;
 }) {
   const { id } = await params;
-  const { error, saved } = await searchParams;
+  const { error, saved, shareError, shared } = await searchParams;
 
   const supabase = createClient(await cookies());
   const {
@@ -35,6 +37,8 @@ export default async function IdeaDetailPage({
   // Only the owner gets the editing UI. RLS still enforces this on write, but
   // hiding the controls keeps the UI honest for view/comment-only viewers.
   const canEdit = idea.owner_id === user.id;
+  const shares = canEdit ? await loadShareRows(supabase, "idea", idea.id) : [];
+  const returnTo = `/ideas/${idea.id}`;
 
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "2rem 1.25rem" }}>
@@ -44,6 +48,8 @@ export default async function IdeaDetailPage({
 
       {error && <p style={errorBanner}>{error}</p>}
       {saved && <p style={okBanner}>Saved.</p>}
+      {shareError && <p style={errorBanner}>{shareError}</p>}
+      {shared && <p style={okBanner}>Sharing updated.</p>}
 
       {signed && (
         /* eslint-disable-next-line @next/next/no-img-element */
@@ -85,6 +91,14 @@ export default async function IdeaDetailPage({
           <div style={{ marginTop: "1.5rem" }}>
             <DeleteIdeaButton ideaId={idea.id} />
           </div>
+
+          <SharePanel
+            objectType="idea"
+            objectId={idea.id}
+            visibility={idea.visibility}
+            shares={shares}
+            returnTo={returnTo}
+          />
         </>
       ) : (
         <article style={{ ...card, marginTop: "1rem" }}>

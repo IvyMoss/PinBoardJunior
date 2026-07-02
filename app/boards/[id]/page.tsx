@@ -4,6 +4,8 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { signPaths } from "@/lib/media";
 import { addIdeaToBoard, removeIdeaFromBoard } from "../actions";
+import { SharePanel } from "@/app/share/SharePanel";
+import { loadShareRows } from "@/app/share/data";
 
 interface IdeaLite {
   id: string;
@@ -19,10 +21,10 @@ export default async function BoardDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; shareError?: string; shared?: string }>;
 }) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, shareError, shared } = await searchParams;
 
   const supabase = createClient(await cookies());
   const {
@@ -33,10 +35,13 @@ export default async function BoardDetailPage({
   // RLS returns this row only if the viewer is allowed to see the board.
   const { data: board } = await supabase
     .from("boards")
-    .select("id, title, visibility")
+    .select("id, owner_id, title, visibility")
     .eq("id", id)
     .single();
   if (!board) notFound();
+  const isOwner = board.owner_id === user.id;
+  const shares = isOwner ? await loadShareRows(supabase, "board", board.id) : [];
+  const returnTo = `/boards/${board.id}`;
 
   // Ideas placed in this board. The join is gated by RLS on both tables, so a
   // private idea owned by someone else would simply not come back.
@@ -77,6 +82,18 @@ export default async function BoardDetailPage({
       </header>
 
       {error && <p style={errorBanner}>Couldn’t update board: {error}</p>}
+      {shareError && <p style={errorBanner}>{shareError}</p>}
+      {shared && <p style={okBanner}>Sharing updated.</p>}
+
+      {isOwner && (
+        <SharePanel
+          objectType="board"
+          objectId={board.id}
+          visibility={board.visibility}
+          shares={shares}
+          returnTo={returnTo}
+        />
+      )}
 
       {/* Add an idea */}
       {candidates.length > 0 && (
@@ -195,6 +212,14 @@ const removeBtn: React.CSSProperties = {
 const errorBanner: React.CSSProperties = {
   color: "#c0392b",
   background: "#fdecea",
+  padding: "0.7rem 0.9rem",
+  borderRadius: 8,
+  fontSize: "0.85rem",
+  marginBottom: "1rem",
+};
+const okBanner: React.CSSProperties = {
+  color: "#1e7e34",
+  background: "#eaf6ec",
   padding: "0.7rem 0.9rem",
   borderRadius: 8,
   fontSize: "0.85rem",
