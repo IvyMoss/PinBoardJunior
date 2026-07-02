@@ -9,6 +9,7 @@ interface SharePanelProps {
   visibility: string;
   shares: ShareRow[];
   returnTo: string;
+  viewerHandle?: string | null;
 }
 
 export function SharePanel({
@@ -17,6 +18,7 @@ export function SharePanel({
   visibility,
   shares,
   returnTo,
+  viewerHandle,
 }: SharePanelProps) {
   const isPrivate = visibility === "private";
   const label = objectType === "idea" ? "idea" : "board";
@@ -41,9 +43,16 @@ export function SharePanel({
         <span style={!isPrivate ? activePill : inactivePill}>People</span>
       </div>
 
+      {viewerHandle && <small style={muted}>You are @{viewerHandle}</small>}
+
       <form action={shareObjectWithUser} style={shareForm}>
         <HiddenFields objectType={objectType} objectId={objectId} returnTo={returnTo} />
-        <input name="handle" placeholder="@handle" required style={{ ...inputStyle, flex: 1 }} />
+        <input
+          name="handle"
+          placeholder="Share with @handle"
+          required
+          style={{ ...inputStyle, flex: 1 }}
+        />
         <select name="permission" defaultValue="view" style={selectStyle} aria-label="Permission">
           <option value="view">View</option>
           <option value="comment">Comment</option>

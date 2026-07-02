@@ -41,6 +41,10 @@ export default async function BoardDetailPage({
   if (!board) notFound();
   const isOwner = board.owner_id === user.id;
   const shares = isOwner ? await loadShareRows(supabase, "board", board.id) : [];
+  const { data: profile } = isOwner
+    ? await supabase.from("profiles").select("handle").eq("id", user.id).single()
+    : { data: null };
+  const viewerHandle = (profile as { handle?: string } | null)?.handle ?? null;
   const returnTo = `/boards/${board.id}`;
 
   // Ideas placed in this board. The join is gated by RLS on both tables, so a
@@ -92,6 +96,7 @@ export default async function BoardDetailPage({
           visibility={board.visibility}
           shares={shares}
           returnTo={returnTo}
+          viewerHandle={viewerHandle}
         />
       )}
 

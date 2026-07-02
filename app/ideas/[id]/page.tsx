@@ -38,6 +38,10 @@ export default async function IdeaDetailPage({
   // hiding the controls keeps the UI honest for view/comment-only viewers.
   const canEdit = idea.owner_id === user.id;
   const shares = canEdit ? await loadShareRows(supabase, "idea", idea.id) : [];
+  const { data: profile } = canEdit
+    ? await supabase.from("profiles").select("handle").eq("id", user.id).single()
+    : { data: null };
+  const viewerHandle = (profile as { handle?: string } | null)?.handle ?? null;
   const returnTo = `/ideas/${idea.id}`;
 
   return (
@@ -98,6 +102,7 @@ export default async function IdeaDetailPage({
             visibility={idea.visibility}
             shares={shares}
             returnTo={returnTo}
+            viewerHandle={viewerHandle}
           />
         </>
       ) : (

@@ -16,6 +16,11 @@ interface IdeaRow {
   media: { bucket: string; path: string } | null;
 }
 
+interface ProfileRow {
+  handle: string;
+  display_name: string | null;
+}
+
 export default async function VaultPage({
   searchParams,
 }: {
@@ -27,6 +32,13 @@ export default async function VaultPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("handle, display_name")
+    .eq("id", user.id)
+    .single();
+  const viewerProfile = profile as ProfileRow | null;
 
   // RLS would also surface other people's public ideas; the vault is *yours*,
   // so scope to your own.
@@ -59,6 +71,7 @@ export default async function VaultPage({
           <Link href="/boards" style={{ color: "#666", fontSize: "0.9rem" }}>
             Boards
           </Link>
+          {viewerProfile?.handle && <span style={handlePill}>@{viewerProfile.handle}</span>}
           <form action={signOut}>
             <button style={linkBtn}>Sign out</button>
           </form>
@@ -181,4 +194,12 @@ const linkBtn: React.CSSProperties = {
   cursor: "pointer",
   fontSize: "0.9rem",
   textDecoration: "underline",
+};
+const handlePill: React.CSSProperties = {
+  color: "#333",
+  border: "1px solid #ddd",
+  borderRadius: 999,
+  padding: "0.2rem 0.5rem",
+  fontSize: "0.8rem",
+  whiteSpace: "nowrap",
 };
