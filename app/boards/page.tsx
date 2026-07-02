@@ -14,9 +14,9 @@ interface BoardRow {
 export default async function BoardsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; deleted?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, deleted } = await searchParams;
   const supabase = createClient(await cookies());
   const {
     data: { user },
@@ -50,6 +50,7 @@ export default async function BoardsPage({
       {error && (
         <p style={errorBanner}>Couldn’t create board: {error}</p>
       )}
+      {deleted && <p style={okBanner}>Board deleted. Your ideas were kept.</p>}
 
       <form action={createBoard} style={captureCard}>
         <input name="title" placeholder="New board title…" required style={inputStyle} />
@@ -109,6 +110,14 @@ const primaryBtn: React.CSSProperties = {
 const errorBanner: React.CSSProperties = {
   color: "#c0392b",
   background: "#fdecea",
+  padding: "0.7rem 0.9rem",
+  borderRadius: 8,
+  fontSize: "0.85rem",
+  marginBottom: "1rem",
+};
+const okBanner: React.CSSProperties = {
+  color: "#1e7e34",
+  background: "#eaf6ec",
   padding: "0.7rem 0.9rem",
   borderRadius: 8,
   fontSize: "0.85rem",

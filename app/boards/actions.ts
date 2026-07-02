@@ -70,3 +70,47 @@ export async function removeIdeaFromBoard(formData: FormData) {
 
   revalidatePath(`/boards/${boardId}`);
 }
+
+export async function deleteBoard(formData: FormData) {
+  const boardId = String(formData.get("boardId") ?? "");
+  if (!boardId) return;
+
+  const supabase = createClient(await cookies());
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: board } = await supabase
+    .from("boards")
+    .select("owner_id")
+    .eq("id", boardId)
+    .single();
+
+  if ((board as { owner_id?: string } | null)?.owner_id !== user.id) {
+    redirect(`/boards/${boardId}?error=${encodeURIComponent("Only the owner can delete this board.")}`);
+  }
+
+  const { error: shareError } = await supabase
+    .from("shares")
+    .delete()
+    .eq("object_type", "board")
+    .eq("object_id", boardId);
+
+  if (shareError) {
+    console.error("deleteBoard share cleanup failed:", shareError);
+    redirect(`/boards/${boardId}?error=${encodeURIComponent(shareError.message)}`);
+  }
+
+  // RLS delete policy is owner-only. Board entries cascade through board_items;
+  // deleting the board does not delete the underlying ideas in the vault.
+  const { error } = await supabase.from("boards").delete().eq("id", boardId);
+
+  if (error) {
+    console.error("deleteBoard failed:", error);
+    redirect(`/boards/${boardId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/boards");
+  redirect("/boards?deleted=1");
+}

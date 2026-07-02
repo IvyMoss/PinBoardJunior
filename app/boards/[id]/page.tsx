@@ -3,9 +3,11 @@ import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { signPaths } from "@/lib/media";
-import { addIdeaToBoard, removeIdeaFromBoard } from "../actions";
+import { addIdeaToBoard } from "../actions";
 import { SharePanel } from "@/app/share/SharePanel";
 import { loadShareRows } from "@/app/share/data";
+import { DeleteBoardButton } from "./DeleteBoardButton";
+import { RemoveFromBoardButton } from "./RemoveFromBoardButton";
 
 interface IdeaLite {
   id: string;
@@ -90,18 +92,23 @@ export default async function BoardDetailPage({
       {shared && <p style={okBanner}>Sharing updated.</p>}
 
       {isOwner && (
-        <SharePanel
-          objectType="board"
-          objectId={board.id}
-          visibility={board.visibility}
-          shares={shares}
-          returnTo={returnTo}
-          viewerHandle={viewerHandle}
-        />
+        <>
+          <SharePanel
+            objectType="board"
+            objectId={board.id}
+            visibility={board.visibility}
+            shares={shares}
+            returnTo={returnTo}
+            viewerHandle={viewerHandle}
+          />
+          <div style={{ margin: "1rem 0 1.5rem" }}>
+            <DeleteBoardButton boardId={board.id} />
+          </div>
+        </>
       )}
 
       {/* Add an idea */}
-      {candidates.length > 0 && (
+      {isOwner && candidates.length > 0 && (
         <form action={addIdeaToBoard} style={addRow}>
           <input type="hidden" name="boardId" value={board.id} />
           <select name="ideaId" required style={{ ...inputStyle, flex: 1 }}>
@@ -154,13 +161,7 @@ export default async function BoardDetailPage({
                 Open
               </Link>
               <small style={{ color: "#999" }}>{i.visibility}</small>
-              <form action={removeIdeaFromBoard}>
-                <input type="hidden" name="boardId" value={board.id} />
-                <input type="hidden" name="ideaId" value={i.id} />
-                <button style={removeBtn} aria-label="Remove from board">
-                  Remove
-                </button>
-              </form>
+              {isOwner && <RemoveFromBoardButton boardId={board.id} ideaId={i.id} />}
             </div>
           </article>
         ))}
@@ -204,15 +205,6 @@ const primaryBtn: React.CSSProperties = {
   color: "#fff",
   cursor: "pointer",
   fontSize: "0.95rem",
-};
-const removeBtn: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  color: "#c0392b",
-  cursor: "pointer",
-  fontSize: "0.8rem",
-  textDecoration: "underline",
-  padding: 0,
 };
 const errorBanner: React.CSSProperties = {
   color: "#c0392b",
